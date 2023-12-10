@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
 
-from dataclasses import dataclass
-from math import prod
-import pprint as pp
-
-@dataclass
-class ScratchCard:
-    wins: list
-    nums: list
-
 def parse(file):
     map = []
+
     with open(file) as fd:
-        line_len = 0
         for y, line in enumerate(fd):
             line = line.strip()
-            line_len = len(line)
             for x, char in enumerate(line):
                 if char == 'S':
+                    # Account for halo of empty space
                     start = (x+1, y+1)
+            # Use list of chars rather string for easier manipulation
             map.append(list('.'+line+'.'))
-    
+
+    # Add halo of empty space around the map 
+    line_len = len(map[0])
     map = [list('.'*(line_len+2))] + map + [list('.'*(line_len+2))]
     return start, map
 
@@ -32,9 +26,6 @@ def print_map(map):
 
 def solve_p1(file):
     start, map = parse(file)
-
-    # print(start)
-    # print_map(map)
 
     dirs_d = {}
     dirs = {'S': (0, 1), 'E': (1, 0), 'N': (0, -1), 'W': (-1, 0)}
@@ -59,30 +50,38 @@ def solve_p1(file):
     paths_d['F'] = [paths['S'], paths['E']]
 
     frontier = [start]
-    length = 0
-    exploring = True
-    while exploring:
-        exploring = False
+    length = -1
+    while len(frontier) > 0:
+        length += 1
+
+        # Explore all paths one step at a time
         next_frontier = []
         for pos in frontier:
             cur_path = map[pos[1]][pos[0]]
+            # Mark visited points to exclude them from frontier
             map[pos[1]][pos[0]] = '#'
+            # Check next valid directions and paths
             for p, d in zip(paths_d[cur_path], dirs_d[cur_path]):
                 pos_next = (pos[0]+d[0], pos[1]+d[1])
                 map_next = map[pos_next[1]][pos_next[0]]
-                # print(pos_next, map_next)
+                # Check if the next path actually connects
                 if map_next in p:
-                    # print('found')
-                    if not exploring:
-                        length += 1
                     next_frontier.append(pos_next)
-                    exploring = True
         frontier = next_frontier
-        # print(length)
-        # print_map(map)
-        # print()
 
     print(f'Part 1 - {file}: {length}')
+
+# Mark everything in a line from side as 'I'nside
+def mark_line_inside(map, dirs, sides_d, covered, pos, dir):
+    if dir != 'A':
+        t = sides_d[dir]
+        pos_next = pos
+        while True:
+            pos_next = (pos_next[0]+dirs[t][0], pos_next[1]+dirs[t][1])
+            if pos_next not in covered:
+                map[pos_next[1]][pos_next[0]] = 'I'
+            else:
+                break
 
 def solve_p2(file, flip=False):
     start, map = parse(file)
@@ -130,11 +129,8 @@ def solve_p2(file, flip=False):
 
     # First pass to mark the pipe in the covered dict
     frontier = [(start, 'A')]
-    length = 0
-    exploring = True
     covered = {}
-    while exploring:
-        exploring = False
+    while len(frontier) > 0:
         next_frontier = []
         for pos_dir in frontier:
             pos = pos_dir[0]
@@ -144,44 +140,23 @@ def solve_p2(file, flip=False):
             for p, d in zip(paths_d[cur_path], dirs_d[cur_path]):
                 pos_next = (pos[0]+dirs[d][0], pos[1]+dirs[d][1])
                 map_next = map[pos_next[1]][pos_next[0]]
-                # print(pos_next, map_next)
                 if map_next in paths[p]:
-                    # print('found')
-                    if not exploring:
-                        length += 1
                     next_frontier.append((pos_next, d))
-                    exploring = True
                     if cur_path == 'S':
                         break
         frontier = next_frontier
 
-    # print_map(map)
-    # print()
-
     # Second pass to mark everything inside the pipe
     start, map = parse(file)
     frontier = [(start, 'A')]
-    length = 0
-    exploring = True
-    while exploring:
-        exploring = False
+    while len(frontier) > 0:
         next_frontier = []
         for pos_dir in frontier:
             pos = pos_dir[0]
             dir = pos_dir[1]
             cur_path = map[pos[1]][pos[0]]
 
-            # Mark everything in a line from side as 'I'nside
-            # print(pos, dir, cur_path)
-            if dir != 'A':
-                t = sides_d[dir]
-                pos_next = pos
-                while True:
-                    pos_next = (pos_next[0]+dirs[t][0], pos_next[1]+dirs[t][1])
-                    if pos_next not in covered:
-                        map[pos_next[1]][pos_next[0]] = 'I'
-                    else:
-                        break
+            mark_line_inside(map, dirs, sides_d, covered, pos, dir)
 
             map[pos[1]][pos[0]] = '#'
             for p, d in zip(paths_d[cur_path], dirs_d[cur_path]):
@@ -189,29 +164,13 @@ def solve_p2(file, flip=False):
                 map_next = map[pos_next[1]][pos_next[0]]
                 # print(pos_next, map_next)
                 if map_next in paths[p]:
-                    # print('found')
-                    if not exploring:
-                        length += 1
                     next_frontier.append((pos_next, d))
 
-                    # Mark everything in a line from side as 'I'nside
-                    dir = d
-                    if dir != 'A':
-                        t = sides_d[dir]
-                        pos_next = pos
-                        while True:
-                            pos_next = (pos_next[0]+dirs[t][0], pos_next[1]+dirs[t][1])
-                            if pos_next not in covered:
-                                map[pos_next[1]][pos_next[0]] = 'I'
-                            else:
-                                break
+                    mark_line_inside(map, dirs, sides_d, covered, pos, d)
 
-                    exploring = True
                     if cur_path == 'S':
                         break
         frontier = next_frontier
-
-    # print_map(map)
 
     count = 0
     for line in map:
