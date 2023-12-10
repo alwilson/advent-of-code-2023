@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import copy
+
 def parse(file):
     map = []
 
@@ -83,11 +85,48 @@ def mark_line_inside(map, dirs, sides_d, covered, pos, dir):
             else:
                 break
 
+def explore_line(start, map, dirs_d, dirs, sides_d, paths_d, paths, covered, mark=False):
+    frontier = [(start, 'A')]
+
+    # Explore one path one step at a time
+    # Optionally mark everything inside the pipe if mark is set
+    while len(frontier) > 0:
+        next_frontier = []
+        for pos_dir in frontier:
+            pos = pos_dir[0]
+            dir = pos_dir[1]
+            cur_path = map[pos[1]][pos[0]]
+
+            covered[pos] = True
+
+            if mark:
+                mark_line_inside(map, dirs, sides_d, covered, pos, dir)
+
+            # Mark visited points to exclude them from frontier
+            map[pos[1]][pos[0]] = '#'
+            # Check next valid directions and paths
+            for p, d in zip(paths_d[cur_path], dirs_d[cur_path]):
+                pos_next = (pos[0]+dirs[d][0], pos[1]+dirs[d][1])
+                map_next = map[pos_next[1]][pos_next[0]]
+
+                # Check if the next path actually connects
+                if map_next in paths[p]:
+                    next_frontier.append((pos_next, d))
+
+                    if mark:
+                        mark_line_inside(map, dirs, sides_d, covered, pos, d)
+
+                    # Intentianally stop frontier from having multiple paths
+                    # this makes it easier to track direction and which side
+                    # is the inside of the pipe
+                    if cur_path == 'S':
+                        break
+        frontier = next_frontier
+
 def solve_p2(file, flip=False):
     start, map = parse(file)
+    map_copy = copy.deepcopy(map)
 
-    # print(start)
-    # print_map(map)
 
     dirs_d = {}
     dirs = {'S': (0, 1), 'E': (1, 0), 'N': (0, -1), 'W': (-1, 0)}
@@ -128,57 +167,15 @@ def solve_p2(file, flip=False):
     paths_d['F'] = ['S', 'E']
 
     # First pass to mark the pipe in the covered dict
-    frontier = [(start, 'A')]
     covered = {}
-    while len(frontier) > 0:
-        next_frontier = []
-        for pos_dir in frontier:
-            pos = pos_dir[0]
-            covered[pos] = True
-            cur_path = map[pos[1]][pos[0]]
-            map[pos[1]][pos[0]] = '#'
-            for p, d in zip(paths_d[cur_path], dirs_d[cur_path]):
-                pos_next = (pos[0]+dirs[d][0], pos[1]+dirs[d][1])
-                map_next = map[pos_next[1]][pos_next[0]]
-                if map_next in paths[p]:
-                    next_frontier.append((pos_next, d))
-                    if cur_path == 'S':
-                        break
-        frontier = next_frontier
+    explore_line(start, map, dirs_d, dirs, sides_d, paths_d, paths, covered, False)
 
     # Second pass to mark everything inside the pipe
-    start, map = parse(file)
-    frontier = [(start, 'A')]
-    while len(frontier) > 0:
-        next_frontier = []
-        for pos_dir in frontier:
-            pos = pos_dir[0]
-            dir = pos_dir[1]
-            cur_path = map[pos[1]][pos[0]]
+    map = map_copy
+    explore_line(start, map, dirs_d, dirs, sides_d, paths_d, paths, covered, True)
 
-            mark_line_inside(map, dirs, sides_d, covered, pos, dir)
-
-            map[pos[1]][pos[0]] = '#'
-            for p, d in zip(paths_d[cur_path], dirs_d[cur_path]):
-                pos_next = (pos[0]+dirs[d][0], pos[1]+dirs[d][1])
-                map_next = map[pos_next[1]][pos_next[0]]
-                # print(pos_next, map_next)
-                if map_next in paths[p]:
-                    next_frontier.append((pos_next, d))
-
-                    mark_line_inside(map, dirs, sides_d, covered, pos, d)
-
-                    if cur_path == 'S':
-                        break
-        frontier = next_frontier
-
-    count = 0
-    for line in map:
-        for char in line:
-            if char == 'I':
-                count += 1
-
-    print(f'Part 2 - {file}: {count}')
+    i_count = sum([line.count('I') for line in map])
+    print(f'Part 2 - {file}: {i_count}')
 
 solve_p1('./example.txt')
 solve_p1('./example2.txt')
